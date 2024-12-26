@@ -93,9 +93,9 @@ export default function SignupPage() {
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="vendor">Vendor</SelectItem>
+                  <SelectItem value="na">NA</SelectItem>
+                  <SelectItem value="n/a">NA</SelectItem>
                 </SelectContent>
               </Select>
             </div>
