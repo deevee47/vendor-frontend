@@ -1,0 +1,215 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  name      String
+  role      Role     @default(Client)
+  password  String
+  isActive  Boolean  @default(true)
+  isStaff   Boolean  @default(false)
+  isSuperuser Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  vendor    Vendor?
+  client    Client?
+}
+
+enum Role {
+  Vendor
+  Client
+}
+
+model Vendor {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @unique @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+  name          String
+  address       String
+  contactNumber String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orders        Order[]
+  lots          Lot[]
+  clients       VendorClient[]
+}
+
+model Client {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @unique @db.ObjectId
+  user          User      @relation(fields: [userId], references: [id])
+  name          String
+  address       String
+  contactNumber String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  warehouses    Warehouse[]
+  orders        Order[]
+  vendors       VendorClient[]
+}
+
+model Warehouse {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  clientId  String    @db.ObjectId
+  client    Client    @relation(fields: [clientId], references: [id])
+  name      String
+  location  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  orders    OrderProduct[]
+  lots      Lot[]
+  rfids     RFID[]
+}
+
+model Order {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  clientId      String    @db.ObjectId
+  vendorId      String    @db.ObjectId
+  client        Client    @relation(fields: [clientId], references: [id])
+  vendor        Vendor    @relation(fields: [vendorId], references: [id])
+  status        OrderStatus @default(Initialised)
+  orderDate     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      OrderProduct[]
+  lots          Lot[]
+}
+
+enum OrderStatus {
+  Initialised
+  InProgress
+  Completed
+}
+
+model Product {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String
+  description          String
+  rfidRequiredAtSubUnit Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  orderProducts        OrderProduct[]
+  lotProducts          LotProduct[]
+}
+
+model OrderProduct {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId     String    @db.ObjectId
+  productId   String    @db.ObjectId
+  warehouseId String    @db.ObjectId
+  order       Order     @relation(fields: [orderId], references: [id])
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  quantity    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Lot {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId         String    @db.ObjectId
+  vendorId        String    @db.ObjectId
+  warehouseId     String    @db.ObjectId
+  order           Order     @relation(fields: [orderId], references: [id])
+  vendor          Vendor    @relation(fields: [vendorId], references: [id])
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  perBoxQuantity  Int
+  totalQuantity   Int       @default(0)
+  status          LotStatus @default(InProgress)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  products        LotProduct[]
+  rfids           RFID[]
+  rfidEvents      RFIDEvent[]
+}
+
+enum LotStatus {
+  InProgress
+  VendorDispatched
+  WarehouseReached
+}
+
+model LotProduct {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  lotId     String    @db.ObjectId
+  productId String    @db.ObjectId
+  lot       Lot       @relation(fields: [lotId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model RFID {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  epcHex          String    @unique
+  lotId           String    @db.ObjectId
+  warehouseId     String    @db.ObjectId
+  lot             Lot       @relation(fields: [lotId], references: [id])
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  subUnitQuantity Int?
+  scannedAt       DateTime  @default(now())
+  antennaName     String?
+  status          RFIDStatus @default(InTransit)
+}
+
+enum RFIDStatus {
+  InTransit
+  WarehouseReached
+  Sold
+}
+
+model RFIDEvent {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  antennaName String?
+  eventType   String    @default("tagInventory")
+  timestamp   DateTime  @default(now())
+  lotId       String?   @db.ObjectId
+  lot         Lot?      @relation(fields: [lotId], references: [id])
+  tags        RFIDTag[]
+}
+
+model RFIDTag {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  eventId   String    @db.ObjectId
+  event     RFIDEvent @relation(fields: [eventId], references: [id])
+  epc       String    @unique
+  createdAt DateTime  @default(now())
+}
+
+model Log {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  eventType LogEventType
+  message   String
+  details   Json
+  timestamp DateTime  @default(now())
+  createdAt DateTime  @default(now())
+}
+
+enum LogEventType {
+  Success
+  Error
+  Info
+}
+
+model VendorClient {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId  String    @db.ObjectId
+  clientId  String    @db.ObjectId
+  vendor    Vendor    @relation(fields: [vendorId], references: [id])
+  client    Client    @relation(fields: [clientId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
